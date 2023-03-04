@@ -17,7 +17,13 @@
 		<icon name="encumbrance_icon" file="graphics/icons/encumbrance_icon.png" />
 
 		<string name="option_header_encumbrancetracker">EncumbranceTracker (GM)</string>
-		<string name="option_label_ENCUMBRANCETRACKER_CLIENT_CHAT">Chat: Show to Player</string>
-		<string name="option_label_ENCUMBRANCETRACKER_VERBOSE">Chat: Verbose Rule Reminders</string>
+		<string name="option_label_ENCUMBRANCETRACKER_MULTIPLIER_BEAR">Override: Aspect of the Bear multiplier</string>
+		<string name="option_label_ENCUMBRANCETRACKER_MULTIPLIER_BURDEN">Override: Beast of Burden multiplier</string>
+		<string name="option_label_ENCUMBRANCETRACKER_MULTIPLIER_EQUINE">Override: Equine Build multiplier</string>
+		<string name="option_label_ENCUMBRANCETRACKER_RULE_DETAIL">Chat: Show rule detail</string>
+		<string name="option_label_ENCUMBRANCETRACKER_STATS">Chat: Show stats</string>
+		<string name="option_label_ENCUMBRANCETRACKER_UNCARRIED">Chat: Show uncarried items count</string>
+		<string name="option_label_ENCUMBRANCETRACKER_VERBOSE">Chat: Extension Verbosity</string>
+		<string name="option_label_ENCUMBRANCETRACKER_ZERO_WEIGHT">Chat: Show zero weight count</string>
 	</base>
 </root>
