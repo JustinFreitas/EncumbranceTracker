@@ -2,7 +2,7 @@
 
 ENCUMBERED = "Encumbered"
 ENCUMBERED_PATTERN_RAW = "[eE][nN][cC][uU][mM][bB][eE][rR][eE][dD]"
-ENCUMBERED_PATTERN = "^%W*" .. ENCUMBERED_PATTERN_RAW .. "%W*$"
+ENCUMBERED_PATTERN = "^%W*" .. ENCUMBERED_PATTERN_RAW
 ENCUMBRANCETRACKER_MULTIPLIER_BEAR = "ENCUMBRANCETRACKER_MULTIPLIER_BEAR"
 ENCUMBRANCETRACKER_MULTIPLIER_BURDEN = "ENCUMBRANCETRACKER_MULTIPLIER_BURDEN"
 ENCUMBRANCETRACKER_MULTIPLIER_EQUINE = "ENCUMBRANCETRACKER_MULTIPLIER_EQUINE"
@@ -13,15 +13,27 @@ ENCUMBRANCETRACKER_VERBOSE = "ENCUMBRANCETRACKER_VERBOSE"
 ENCUMBRANCETRACKER_ZERO_WEIGHT = "ENCUMBRANCETRACKER_ZERO_WEIGHT"
 HEAVILY = "Heavily"
 HEAVILY_ENCUMBERED = HEAVILY .. " " .. ENCUMBERED
-HEAVILY_ENCUMBERED_PATTERN = "^%W*".. "[hH][eE][aA][vV][iI][lL][yY]" .. "%W+" .. ENCUMBERED_PATTERN_RAW .. "%W*$"
+HEAVILY_ENCUMBERED_PATTERN = "^%W*".. "[hH][eE][aA][vV][iI][lL][yY]" .. "%W+" .. ENCUMBERED_PATTERN_RAW
 IS_FGU = true
+LIGHTLY = "Lightly"
+LIGHTLY_ENCUMBERED = LIGHTLY .. " " .. ENCUMBERED
+LIGHTLY_ENCUMBERED_PATTERN = "^%W*".. "[lL][iI][gG][hH][tT][lL][yY]" .. "%W+" .. ENCUMBERED_PATTERN_RAW
 MAX = "max"
 OFF = "off"
 ON = "on"
 OVER = "Over"
 OVER_ENCUMBERED = OVER .. " " .. ENCUMBERED
-OVER_ENCUMBERED_PATTERN = "^%W*".. "[oO][vV][eE][rR]" .. "%W+" .. ENCUMBERED_PATTERN_RAW .. "%W*$"
-USER_ISHOST = false
+OVER_ENCUMBERED_PATTERN = "^%W*".. "[oO][vV][eE][rR]" .. "%W+" .. ENCUMBERED_PATTERN_RAW
+WITH_VARIANT_ENCUMBRANCE = "With variant encumbrance, "
+
+ENCUMBRANCE_EFFECT_PATTERNS = {
+    [ENCUMBERED] = ENCUMBERED_PATTERN,
+    [HEAVILY_ENCUMBERED] = HEAVILY_ENCUMBERED_PATTERN,
+    [LIGHTLY_ENCUMBERED] = LIGHTLY_ENCUMBERED_PATTERN,
+    [OVER_ENCUMBERED] = OVER_ENCUMBERED_PATTERN
+}
+
+local CombatManager_requestActivation = nil
 
 function onInit()
 	local option_header = "option_header_encumbrancetracker"
@@ -49,7 +61,10 @@ function onInit()
     USER_ISHOST = User.isHost()
 
 	if USER_ISHOST then
-		CombatManager.setCustomTurnStart(onTurnStartEvent)
+        CombatManager_requestActivation = CombatManager.requestActivation
+        CombatManager.requestActivation = requestActivation
+        Comm.registerSlashHandler("et", processChatCommand)
+        Comm.registerSlashHandler("encumbrance", processChatCommand)
     end
 end
 
@@ -77,6 +92,14 @@ function addHeavilyEncumberedEffect(nodeCTEntry)
 
     if not hasHeavilyEncumberedEffect(nodeCTEntry) then
         addEffect(nodeCTEntry, HEAVILY_ENCUMBERED)
+    end
+end
+
+function addLightlyEncumberedEffect(nodeCTEntry)
+    if not nodeCTEntry then return end
+
+    if not hasLightlyEncumberedEffect(nodeCTEntry) then
+        addEffect(nodeCTEntry, LIGHTLY_ENCUMBERED)
     end
 end
 
@@ -184,30 +207,15 @@ end
 function hasEffect(nodeCTEntry, sEffect)
     if not nodeCTEntry or not sEffect then return end
 
-    local aEncumbranceEffectPatterns = {
-        ENCUMBERED_PATTERN,
-        HEAVILY_ENCUMBERED_PATTERN,
-        OVER_ENCUMBERED_PATTERN
-    }
-
-    local sEffPattern
-    if sEffect == ENCUMBERED then
-        sEffPattern = ENCUMBERED_PATTERN
-        removeKey(aEncumbranceEffectPatterns, ENCUMBERED_PATTERN)
-    elseif sEffect == HEAVILY_ENCUMBERED then
-        sEffPattern = HEAVILY_ENCUMBERED_PATTERN
-        removeKey(aEncumbranceEffectPatterns, HEAVILY_ENCUMBERED_PATTERN)
-    elseif sEffect == OVER_ENCUMBERED then
-        sEffPattern = OVER_ENCUMBERED_PATTERN
-        removeKey(aEncumbranceEffectPatterns, OVER_ENCUMBERED_PATTERN)
-    else
+    local sEffPattern = ENCUMBRANCE_EFFECT_PATTERNS[sEffect]
+    if sEffPattern == nil then
         return false
     end
 
     for _,nodeEffect in pairs(DB.getChildren(nodeCTEntry, "effects")) do
 		if DB.getValue(nodeEffect, "label", ""):match(sEffPattern) then
             -- We matched the explicitly requested pattern, delete the unmatched others (mutually exclusive)
-            RemoveEffects(nodeCTEntry, aEncumbranceEffectPatterns, sEffPattern)
+            RemoveEffects(nodeCTEntry, ENCUMBRANCE_EFFECT_PATTERNS, nodeEffect)
 			return true
 		end
 	end
@@ -225,6 +233,12 @@ function hasHeavilyEncumberedEffect(nodeCTEntry)
     if not nodeCTEntry then return end
 
     return hasEffect(nodeCTEntry, HEAVILY_ENCUMBERED)
+end
+
+function hasLightlyEncumberedEffect(nodeCTEntry)
+    if not nodeCTEntry then return end
+
+    return hasEffect(nodeCTEntry, LIGHTLY_ENCUMBERED)
 end
 
 function hasOverEncumberedEffect(nodeCTEntry)
@@ -249,11 +263,10 @@ function insertStatsIfEnabled(aOutput, load, strength, multiplier, levelStat)
     end
 end
 
--- This function is one that the Combat Tracker calls if present at the start of a creatures turn.  Wired up in onInit() for the host only.
-function onTurnStartEvent(nodeCurrentCTActor) -- arg is CT node
-	if checkVerbosityOff() then return end
-
-    processEncumbranceForActor(nodeCurrentCTActor)
+function processChatCommand()
+	for _,nodeCT in pairs(DB.getChildren(CombatManager.CT_LIST)) do
+        processEncumbranceForActor(nodeCT)
+    end
 end
 
 function processEncumbranceForActor(nodeCurrentCTActor)
@@ -264,33 +277,38 @@ function processEncumbranceForActor(nodeCurrentCTActor)
         local nMultiplier = getEncumbranceMultiplier(nodeCharSheet)
         if nMultiplier > 0 then
             local aOutput = {}
-            local load = DB.getValue(nodeCharSheet, "encumbrance.load", -1)
+            local load = math.floor(DB.getValue(nodeCharSheet, "encumbrance.load", -1))
             local strength = DB.getValue(nodeCharSheet, "abilities.strength.score", -1)
-            local encumbered = strength * 5 * nMultiplier
+            local lightlyEncumbered = strength * 5 * nMultiplier
             local heavy = strength * 10 * nMultiplier
             local max = strength * 15 * nMultiplier
             local sMsgText
             if load > max and strength >= 0 then
-                sMsgText = "'" .. rCurrentActor.sName .. "' is over encumbered."
+                if checkVariantEncumbrance() then
+                    sMsgText = "'" .. rCurrentActor.sName .. "' is over encumbered."
+                    addOverEncumberedEffect(nodeCurrentCTActor)
+                else
+                    sMsgText = "'" .. rCurrentActor.sName .. "' is encumbered."
+                    addEncumberedEffect(nodeCurrentCTActor)
+                end
                 table.insert(aOutput, sMsgText)
                 insertStatsIfEnabled(aOutput, load, strength, nMultiplier, "Max: " .. max)
-                addOverEncumberedEffect(nodeCurrentCTActor)
             elseif checkVariantEncumbrance() and load > heavy and strength >= 0 then
                 sMsgText = "'" .. rCurrentActor.sName .. "' is heavily encumbered."
                 table.insert(aOutput, sMsgText)
                 insertStatsIfEnabled(aOutput, load, strength, nMultiplier, "Heavy: " .. heavy)
                 addHeavilyEncumberedEffect(nodeCurrentCTActor)
                 if OptionsManager.isOption(ENCUMBRANCETRACKER_RULE_DETAIL, ON) then
-                    sMsgText = "If you carry weight in excess of 10 times your Strength score (pre-multiplier), up to your maximum carrying capacity, you are instead heavily encumbered, which means your speed drops by 20 feet and you have disadvantage on ability checks, attack rolls, and saving throws that use Strength, Dexterity, or Constitution."
+                    sMsgText = WITH_VARIANT_ENCUMBRANCE .. "if you carry weight in excess of 10 times your Strength score (pre-multiplier), up to your maximum carrying capacity, you are instead heavily encumbered, which means your speed drops by 20 feet and you have disadvantage on ability checks, attack rolls, and saving throws that use Strength, Dexterity, or Constitution."
                     insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
                 end
-            elseif checkVariantEncumbrance() and load > encumbered and strength >= 0 then
-                sMsgText = "'" .. rCurrentActor.sName .. "' is encumbered."
+            elseif checkVariantEncumbrance() and load > lightlyEncumbered and strength >= 0 then
+                sMsgText = "'" .. rCurrentActor.sName .. "' is lightly encumbered."
                 table.insert(aOutput, sMsgText)
-                insertStatsIfEnabled(aOutput, load, strength, nMultiplier, "Encumbered: " .. encumbered)
-                addEncumberedEffect(nodeCurrentCTActor)
+                insertStatsIfEnabled(aOutput, load, strength, nMultiplier, "Lightly: " .. lightlyEncumbered)
+                addLightlyEncumberedEffect(nodeCurrentCTActor)
                 if OptionsManager.isOption(ENCUMBRANCETRACKER_RULE_DETAIL, ON) then
-                    sMsgText = "If you carry weight in excess of 5 times your Strength score (pre-multiplier), you are encumbered, which means your speed drops by 10 feet."
+                    sMsgText = WITH_VARIANT_ENCUMBRANCE .. "if you carry weight in excess of 5 times your Strength score (pre-multiplier), you are encumbered, which means your speed drops by 10 feet."
                     insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
                 end
             elseif load > -1 and strength >= 0 then
@@ -298,7 +316,11 @@ function processEncumbranceForActor(nodeCurrentCTActor)
                 if checkVerbosityMax() then
                     sMsgText = "'" .. rCurrentActor.sName .. "' is unencumbered."
                     table.insert(aOutput, sMsgText)
-                    insertStatsIfEnabled(aOutput, load, strength, nMultiplier, "Encumbered: " .. encumbered)
+                    if checkVariantEncumbrance() then
+                        insertStatsIfEnabled(aOutput, load, strength, nMultiplier, "Lightly: " .. lightlyEncumbered)
+                    else
+                        insertStatsIfEnabled(aOutput, load, strength, nMultiplier, "Encumbered: " .. max)
+                    end
                 end
             else
                 sMsgText = "'" .. rCurrentActor.sName .. "' could not be analyzed for encumbrance."
@@ -342,13 +364,7 @@ end
 function removeAllEncumbranceEffects(nodeCTEntry)
     if not nodeCTEntry then return end
 
-    local aEffects = {
-        ENCUMBERED_PATTERN,
-        HEAVILY_ENCUMBERED_PATTERN,
-        OVER_ENCUMBERED_PATTERN
-    }
-
-    RemoveEffects(nodeCTEntry, aEffects)
+    RemoveEffects(nodeCTEntry, ENCUMBRANCE_EFFECT_PATTERNS)
 end
 
 function MatchAny( str, pattern_list )
@@ -358,32 +374,20 @@ function MatchAny( str, pattern_list )
     end
 end
 
-function RemoveEffects(nodeCTEntry, aEffects, sKeepOnlyOnePattern)
-    local bFoundKeepOnlyOneElement = false
+function RemoveEffects(nodeCTEntry, aEffects, nodeEffectToKeep)
     for _,nodeEffect in pairs(DB.getChildren(nodeCTEntry, "effects")) do
         local sEffectLabel = DB.getValue(nodeEffect, "label", "")
-		if MatchAny(sEffectLabel, aEffects) then
+		if nodeEffect ~= nodeEffectToKeep and MatchAny(sEffectLabel, aEffects) then
             nodeEffect.delete()
 		end
-
-        if string.match(sEffectLabel, sKeepOnlyOnePattern) then
-            if bFoundKeepOnlyOneElement then
-                nodeEffect.delete()
-            else
-                bFoundKeepOnlyOneElement = true
-            end
-        end
 	end
 end
 
-function removeKey(aTable, key)
-    for i,v in ipairs(aTable) do
-        if v == key then
-            return table.remove(aTable, i)
-        end
-    end
+function requestActivation(nodeCurrentCTActor, bSkipBell)
+    CombatManager_requestActivation(nodeCurrentCTActor, bSkipBell)
+	if checkVerbosityOff() then return end
 
-    return nil
+    processEncumbranceForActor(nodeCurrentCTActor)
 end
 
 function validateTableOrNew(aTable)
