@@ -263,6 +263,13 @@ function insertStatsIfEnabled(aOutput, load, strength, multiplier, levelStat)
     end
 end
 
+function MatchAny(str, pattern_list)
+    for _, pattern in ipairs(pattern_list) do
+        local w = string.match(str, pattern)
+        if w then return w end
+    end
+end
+
 function processChatCommand()
 	for _,nodeCT in pairs(DB.getChildren(CombatManager.CT_LIST)) do
         processEncumbranceForActor(nodeCT)
@@ -273,55 +280,29 @@ function processEncumbranceForActor(nodeCurrentCTActor)
 	local rCurrentActor = ActorManager.resolveActor(nodeCurrentCTActor)
     local nodeCharSheet = DB.findNode(rCurrentActor.sCreatureNode)
 
-    if rCurrentActor.sType == "charsheet" then
+    if ActorManager.isPC(nodeCurrentCTActor) then
         local nMultiplier = getEncumbranceMultiplier(nodeCharSheet)
         if nMultiplier > 0 then
             local aOutput = {}
-            local load = math.floor(DB.getValue(nodeCharSheet, "encumbrance.load", -1))
             local strength = DB.getValue(nodeCharSheet, "abilities.strength.score", -1)
-            local lightlyEncumbered = strength * 5 * nMultiplier
-            local heavy = strength * 10 * nMultiplier
-            local max = strength * 15 * nMultiplier
+            local stats = {
+                nMultiplier = nMultiplier,
+                load = math.floor(DB.getValue(nodeCharSheet, "encumbrance.load", -1)),
+                strength = strength,
+                lightlyEncumbered = strength * 5 * nMultiplier,
+                heavy = strength * 10 * nMultiplier,
+                max = strength * 15 * nMultiplier
+            }
+
             local sMsgText
-            if load > max and strength >= 0 then
-                if checkVariantEncumbrance() then
-                    sMsgText = "'" .. rCurrentActor.sName .. "' is over encumbered."
-                    addOverEncumberedEffect(nodeCurrentCTActor)
-                else
-                    sMsgText = "'" .. rCurrentActor.sName .. "' is encumbered."
-                    addEncumberedEffect(nodeCurrentCTActor)
-                end
-                table.insert(aOutput, sMsgText)
-                insertStatsIfEnabled(aOutput, load, strength, nMultiplier, "Max: " .. max)
-            elseif checkVariantEncumbrance() and load > heavy and strength >= 0 then
-                sMsgText = "'" .. rCurrentActor.sName .. "' is heavily encumbered."
-                table.insert(aOutput, sMsgText)
-                insertStatsIfEnabled(aOutput, load, strength, nMultiplier, "Heavy: " .. heavy)
-                addHeavilyEncumberedEffect(nodeCurrentCTActor)
-                if OptionsManager.isOption(ENCUMBRANCETRACKER_RULE_DETAIL, ON) then
-                    sMsgText = WITH_VARIANT_ENCUMBRANCE .. "if you carry weight in excess of 10 times your Strength score (pre-multiplier), up to your maximum carrying capacity, you are instead heavily encumbered, which means your speed drops by 20 feet and you have disadvantage on ability checks, attack rolls, and saving throws that use Strength, Dexterity, or Constitution."
-                    insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
-                end
-            elseif checkVariantEncumbrance() and load > lightlyEncumbered and strength >= 0 then
-                sMsgText = "'" .. rCurrentActor.sName .. "' is lightly encumbered."
-                table.insert(aOutput, sMsgText)
-                insertStatsIfEnabled(aOutput, load, strength, nMultiplier, "Lightly: " .. lightlyEncumbered)
-                addLightlyEncumberedEffect(nodeCurrentCTActor)
-                if OptionsManager.isOption(ENCUMBRANCETRACKER_RULE_DETAIL, ON) then
-                    sMsgText = WITH_VARIANT_ENCUMBRANCE .. "if you carry weight in excess of 5 times your Strength score (pre-multiplier), you are encumbered, which means your speed drops by 10 feet."
-                    insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
-                end
+            if load > stats.max and strength >= 0 then
+                processOverMaxEncumbrance(aOutput, nodeCurrentCTActor, stats)
+            elseif checkVariantEncumbrance() and load > stats.heavy and strength >= 0 then
+                processVariantHeavilyEncumbered(aOutput, nodeCurrentCTActor, stats)
+            elseif checkVariantEncumbrance() and load > stats.lightlyEncumbered and strength >= 0 then
+                processVariantLightlyEncumbered(aOutput, nodeCurrentCTActor, stats)
             elseif load > -1 and strength >= 0 then
-                removeAllEncumbranceEffects(nodeCurrentCTActor)
-                if checkVerbosityMax() then
-                    sMsgText = "'" .. rCurrentActor.sName .. "' is unencumbered."
-                    table.insert(aOutput, sMsgText)
-                    if checkVariantEncumbrance() then
-                        insertStatsIfEnabled(aOutput, load, strength, nMultiplier, "Lightly: " .. lightlyEncumbered)
-                    else
-                        insertStatsIfEnabled(aOutput, load, strength, nMultiplier, "Encumbered: " .. max)
-                    end
-                end
+                processUnencumbered(aOutput, nodeCurrentCTActor, stats)
             else
                 sMsgText = "'" .. rCurrentActor.sName .. "' could not be analyzed for encumbrance."
                 table.insert(aOutput, sMsgText)
@@ -329,31 +310,7 @@ function processEncumbranceForActor(nodeCurrentCTActor)
 
             if OptionsManager.isOption(ENCUMBRANCETRACKER_UNCARRIED, ON)
                or OptionsManager.isOption(ENCUMBRANCETRACKER_ZERO_WEIGHT, ON) then
-                local countOfZeroWeightItems = 0
-                local countOfUncarriedItems = 0
-                for _,vNode in pairs(DB.getChildren(nodeCharSheet, "inventorylist")) do
-                    local nWeight = DB.getValue(vNode, "weight", 0)
-                    if nWeight <= 0 then
-                        countOfZeroWeightItems = countOfZeroWeightItems + 1
-                    end
-
-                    local nUncarried = DB.getValue(vNode, "carried", 0)
-                    if nUncarried == 0 then
-                        countOfUncarriedItems = countOfUncarriedItems + 1
-                    end
-                end
-
-                if OptionsManager.isOption(ENCUMBRANCETRACKER_ZERO_WEIGHT, ON)
-                    and countOfZeroWeightItems > 0 then
-                    sMsgText = "'" .. rCurrentActor.sName .. "' has " .. countOfZeroWeightItems .. " zero (or less) weight items."
-                    insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
-                end
-
-                if OptionsManager.isOption(ENCUMBRANCETRACKER_UNCARRIED, ON)
-                    and countOfUncarriedItems > 0 then
-                    sMsgText = "'" .. rCurrentActor.sName .. "' has " .. countOfUncarriedItems .. " uncarried items."
-                    insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
-                end
+                processUncarriedAndZeroWeight(aOutput, nodeCharSheet)
             end
 
             displayTableIfNonEmpty(aOutput)
@@ -361,17 +318,90 @@ function processEncumbranceForActor(nodeCurrentCTActor)
     end
 end
 
+function processOverMaxEncumbrance(aOutput, nodeCurrentCTActor, stats)
+    local sMsgText
+    local sDisplayName = ActorManager.getDisplayName(nodeCurrentCTActor)
+    if checkVariantEncumbrance() then
+        sMsgText = "'" .. sDisplayName .. "' is over encumbered."
+        addOverEncumberedEffect(nodeCurrentCTActor)
+    else
+        sMsgText = "'" .. sDisplayName .. "' is encumbered."
+        addEncumberedEffect(nodeCurrentCTActor)
+    end
+
+    table.insert(aOutput, sMsgText)
+    insertStatsIfEnabled(aOutput, load, stats.strength, stats.nMultiplier, "Max: " .. stats.max)
+end
+
+function processUncarriedAndZeroWeight(aOutput, nodeCharSheet)
+    local sMsgText
+    local countOfZeroWeightItems = 0
+    local countOfUncarriedItems = 0
+    for _,vNode in pairs(DB.getChildren(nodeCharSheet, "inventorylist")) do
+        local nWeight = DB.getValue(vNode, "weight", 0)
+        if nWeight <= 0 then
+            countOfZeroWeightItems = countOfZeroWeightItems + 1
+        end
+
+        local nUncarried = DB.getValue(vNode, "carried", 0)
+        if nUncarried == 0 then
+            countOfUncarriedItems = countOfUncarriedItems + 1
+        end
+    end
+
+    if OptionsManager.isOption(ENCUMBRANCETRACKER_ZERO_WEIGHT, ON)
+        and countOfZeroWeightItems > 0 then
+        sMsgText = "'" .. ActorManager.getDisplayName(nodeCharSheet) .. "' has " .. countOfZeroWeightItems .. " zero (or less) weight items."
+        insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
+    end
+
+    if OptionsManager.isOption(ENCUMBRANCETRACKER_UNCARRIED, ON)
+        and countOfUncarriedItems > 0 then
+        sMsgText = "'" .. ActorManager.getDisplayName(nodeCharSheet) .. "' has " .. countOfUncarriedItems .. " uncarried items."
+        insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
+    end
+end
+
+function processUnencumbered(aOutput, nodeCurrentCTActor, stats)
+    local sMsgText
+    removeAllEncumbranceEffects(nodeCurrentCTActor)
+    if checkVerbosityMax() then
+        sMsgText = "'" .. ActorManager.getDisplayName(nodeCurrentCTActor) .. "' is unencumbered."
+        table.insert(aOutput, sMsgText)
+        if checkVariantEncumbrance() then
+            insertStatsIfEnabled(aOutput, stats.load, stats.strength, stats.nMultiplier, "Lightly: " .. stats.lightlyEncumbered)
+        else
+            insertStatsIfEnabled(aOutput, stats.load, stats.strength, stats.nMultiplier, "Encumbered: " .. stats.max)
+        end
+    end
+end
+
+function processVariantHeavilyEncumbered(aOutput, nodeCurrentCTActor, stats)
+    local sMsgText = "'" .. ActorManager.getDisplayName(nodeCurrentCTActor) .. "' is heavily encumbered."
+    table.insert(aOutput, sMsgText)
+    insertStatsIfEnabled(aOutput, load, stats.strength, stats.nMultiplier, "Heavy: " .. stats.heavy)
+    addHeavilyEncumberedEffect(nodeCurrentCTActor)
+    if OptionsManager.isOption(ENCUMBRANCETRACKER_RULE_DETAIL, ON) then
+        sMsgText = WITH_VARIANT_ENCUMBRANCE .. "if you carry weight in excess of 10 times your Strength score (pre-multiplier), up to your maximum carrying capacity, you are instead heavily encumbered, which means your speed drops by 20 feet and you have disadvantage on ability checks, attack rolls, and saving throws that use Strength, Dexterity, or Constitution."
+        insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
+    end
+end
+
+function processVariantLightlyEncumbered(aOutput, nodeCurrentCTActor, stats)
+    local sMsgText = "'" .. ActorManager.getDisplayName(nodeCurrentCTActor) .. "' is lightly encumbered."
+    table.insert(aOutput, sMsgText)
+    insertStatsIfEnabled(aOutput, stats.load, stats.strength, stats.nMultiplier, "Lightly: " .. stats.lightlyEncumbered)
+    addLightlyEncumberedEffect(nodeCurrentCTActor)
+    if OptionsManager.isOption(ENCUMBRANCETRACKER_RULE_DETAIL, ON) then
+        sMsgText = WITH_VARIANT_ENCUMBRANCE .. "if you carry weight in excess of 5 times your Strength score (pre-multiplier), you are encumbered, which means your speed drops by 10 feet."
+        insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
+    end
+end
+
 function removeAllEncumbranceEffects(nodeCTEntry)
     if not nodeCTEntry then return end
 
     RemoveEffects(nodeCTEntry, ENCUMBRANCE_EFFECT_PATTERNS)
-end
-
-function MatchAny( str, pattern_list )
-    for _, pattern in ipairs( pattern_list ) do
-        local w = string.match( str, pattern )
-        if w then return w end
-    end
 end
 
 function RemoveEffects(nodeCTEntry, aEffects, nodeEffectToKeep)
