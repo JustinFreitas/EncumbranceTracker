@@ -295,13 +295,13 @@ function processEncumbranceForActor(nodeCurrentCTActor)
             }
 
             local sMsgText
-            if load > stats.max and strength >= 0 then
+            if stats.load > stats.max and strength >= 0 then
                 processOverMaxEncumbrance(aOutput, nodeCurrentCTActor, stats)
-            elseif checkVariantEncumbrance() and load > stats.heavy and strength >= 0 then
+            elseif checkVariantEncumbrance() and stats.load > stats.heavy and strength >= 0 then
                 processVariantHeavilyEncumbered(aOutput, nodeCurrentCTActor, stats)
-            elseif checkVariantEncumbrance() and load > stats.lightlyEncumbered and strength >= 0 then
+            elseif checkVariantEncumbrance() and stats.load > stats.lightlyEncumbered and strength >= 0 then
                 processVariantLightlyEncumbered(aOutput, nodeCurrentCTActor, stats)
-            elseif load > -1 and strength >= 0 then
+            elseif stats.load > -1 and strength >= 0 then
                 processUnencumbered(aOutput, nodeCurrentCTActor, stats)
             else
                 sMsgText = "'" .. rCurrentActor.sName .. "' could not be analyzed for encumbrance."
