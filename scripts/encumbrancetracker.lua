@@ -259,15 +259,18 @@ end
 function insertStatsIfEnabled(aOutput, load, strength, multiplier, levelStat)
     if OptionsManager.isOption(ENCUMBRANCETRACKER_STATS, ON) then
         local sMsgText = "Load: " .. load .. ", Str: " .. strength .. ", Mult: " .. multiplier .. ", " .. levelStat
-        insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
+        table.insert(aOutput, sMsgText)
     end
 end
 
-function MatchAny(str, pattern_list)
-    for _, pattern in ipairs(pattern_list) do
-        local w = string.match(str, pattern)
-        if w then return w end
+function matchAny(str, pattern_list)
+    for _, pattern in pairs(pattern_list) do
+        if string.match(str, pattern) then
+            return true
+        end
     end
+
+    return false
 end
 
 function processChatCommand()
@@ -352,13 +355,13 @@ function processUncarriedAndZeroWeight(aOutput, nodeCharSheet)
     if OptionsManager.isOption(ENCUMBRANCETRACKER_ZERO_WEIGHT, ON)
         and countOfZeroWeightItems > 0 then
         sMsgText = "'" .. ActorManager.getDisplayName(nodeCharSheet) .. "' has " .. countOfZeroWeightItems .. " zero (or less) weight items."
-        insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
+        table.insert(aOutput, sMsgText)
     end
 
     if OptionsManager.isOption(ENCUMBRANCETRACKER_UNCARRIED, ON)
         and countOfUncarriedItems > 0 then
         sMsgText = "'" .. ActorManager.getDisplayName(nodeCharSheet) .. "' has " .. countOfUncarriedItems .. " uncarried items."
-        insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
+        table.insert(aOutput, sMsgText)
     end
 end
 
@@ -367,7 +370,7 @@ function processUnencumbered(aOutput, nodeCurrentCTActor, stats)
     removeAllEncumbranceEffects(nodeCurrentCTActor)
     if checkVerbosityMax() then
         sMsgText = "'" .. ActorManager.getDisplayName(nodeCurrentCTActor) .. "' is unencumbered."
-        table.insert(aOutput, sMsgText)
+        insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
         if checkVariantEncumbrance() then
             insertStatsIfEnabled(aOutput, stats.load, stats.strength, stats.nMultiplier, "Lightly: " .. stats.lightlyEncumbered)
         else
@@ -407,7 +410,7 @@ end
 function RemoveEffects(nodeCTEntry, aEffects, nodeEffectToKeep)
     for _,nodeEffect in pairs(DB.getChildren(nodeCTEntry, "effects")) do
         local sEffectLabel = DB.getValue(nodeEffect, "label", "")
-		if nodeEffect ~= nodeEffectToKeep and MatchAny(sEffectLabel, aEffects) then
+		if nodeEffect ~= nodeEffectToKeep and matchAny(sEffectLabel, aEffects) then
             nodeEffect.delete()
 		end
 	end
