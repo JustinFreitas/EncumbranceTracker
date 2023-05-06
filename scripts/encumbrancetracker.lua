@@ -264,7 +264,7 @@ function insertStatsIfEnabled(aOutput, load, strength, multiplier, levelStat)
 end
 
 function matchAny(str, pattern_list)
-    for _, pattern in pairs(pattern_list) do
+    for _,pattern in pairs(pattern_list) do
         if string.match(str, pattern) then
             return true
         end
@@ -288,35 +288,35 @@ function processEncumbranceForActor(nodeCurrentCTActor, aOutput)
 
     if ActorManager.isPC(nodeCurrentCTActor) then
         local nMultiplier = getEncumbranceMultiplier(nodeCharSheet)
-        if nMultiplier > 0 then
-            local strength = DB.getValue(nodeCharSheet, "abilities.strength.score", -1)
-            local stats = {
-                nMultiplier = nMultiplier,
-                load = math.floor(DB.getValue(nodeCharSheet, "encumbrance.load", -1)),
-                strength = strength,
-                lightlyEncumbered = strength * 5 * nMultiplier,
-                heavy = strength * 10 * nMultiplier,
-                max = strength * 15 * nMultiplier
-            }
+        local strength = DB.getValue(nodeCharSheet, "abilities.strength.score", -1)
+        if nMultiplier < 0 or strength < 0 then return end
 
-            local sMsgText
-            if stats.load > stats.max and strength >= 0 then
-                processOverMaxEncumbrance(aOutput, nodeCurrentCTActor, stats)
-            elseif checkVariantEncumbrance() and stats.load > stats.heavy and strength >= 0 then
-                processVariantHeavilyEncumbered(aOutput, nodeCurrentCTActor, stats)
-            elseif checkVariantEncumbrance() and stats.load > stats.lightlyEncumbered and strength >= 0 then
-                processVariantLightlyEncumbered(aOutput, nodeCurrentCTActor, stats)
-            elseif stats.load > -1 and strength >= 0 then
-                processUnencumbered(aOutput, nodeCurrentCTActor, stats)
-            else
-                sMsgText = "'" .. rCurrentActor.sName .. "' could not be analyzed for encumbrance."
-                table.insert(aOutput, sMsgText)
-            end
+        local stats = {
+            nMultiplier = nMultiplier,
+            load = math.floor(DB.getValue(nodeCharSheet, "encumbrance.load", -1)),
+            strength = strength,
+            lightlyEncumbered = strength * 5 * nMultiplier,
+            heavy = strength * 10 * nMultiplier,
+            max = strength * 15 * nMultiplier
+        }
 
-            if OptionsManager.isOption(ENCUMBRANCETRACKER_UNCARRIED, ON)
-               or OptionsManager.isOption(ENCUMBRANCETRACKER_ZERO_WEIGHT, ON) then
-                processUncarriedAndZeroWeight(aOutput, nodeCharSheet)
-            end
+        local sMsgText
+        if stats.load > stats.max then
+            processOverMaxEncumbrance(aOutput, nodeCurrentCTActor, stats)
+        elseif checkVariantEncumbrance() and stats.load > stats.heavy then
+            processVariantHeavilyEncumbered(aOutput, nodeCurrentCTActor, stats)
+        elseif checkVariantEncumbrance() and stats.load > stats.lightlyEncumbered then
+            processVariantLightlyEncumbered(aOutput, nodeCurrentCTActor, stats)
+        elseif stats.load > -1 then
+            processUnencumbered(aOutput, nodeCurrentCTActor, stats)
+        else
+            sMsgText = "'" .. rCurrentActor.sName .. "' could not be analyzed for encumbrance."
+            insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
+        end
+
+        if OptionsManager.isOption(ENCUMBRANCETRACKER_UNCARRIED, ON)
+        or OptionsManager.isOption(ENCUMBRANCETRACKER_ZERO_WEIGHT, ON) then
+            processUncarriedAndZeroWeight(aOutput, nodeCharSheet)
         end
     end
 end
