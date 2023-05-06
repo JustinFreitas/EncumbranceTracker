@@ -271,19 +271,21 @@ function MatchAny(str, pattern_list)
 end
 
 function processChatCommand()
+    local aOutput = {}
 	for _,nodeCT in pairs(DB.getChildren(CombatManager.CT_LIST)) do
-        processEncumbranceForActor(nodeCT)
+        processEncumbranceForActor(nodeCT, aOutput)
     end
+
+    displayTableIfNonEmpty(aOutput)
 end
 
-function processEncumbranceForActor(nodeCurrentCTActor)
+function processEncumbranceForActor(nodeCurrentCTActor, aOutput)
 	local rCurrentActor = ActorManager.resolveActor(nodeCurrentCTActor)
     local nodeCharSheet = DB.findNode(rCurrentActor.sCreatureNode)
 
     if ActorManager.isPC(nodeCurrentCTActor) then
         local nMultiplier = getEncumbranceMultiplier(nodeCharSheet)
         if nMultiplier > 0 then
-            local aOutput = {}
             local strength = DB.getValue(nodeCharSheet, "abilities.strength.score", -1)
             local stats = {
                 nMultiplier = nMultiplier,
@@ -312,8 +314,6 @@ function processEncumbranceForActor(nodeCurrentCTActor)
                or OptionsManager.isOption(ENCUMBRANCETRACKER_ZERO_WEIGHT, ON) then
                 processUncarriedAndZeroWeight(aOutput, nodeCharSheet)
             end
-
-            displayTableIfNonEmpty(aOutput)
         end
     end
 end
@@ -329,8 +329,8 @@ function processOverMaxEncumbrance(aOutput, nodeCurrentCTActor, stats)
         addEncumberedEffect(nodeCurrentCTActor)
     end
 
-    table.insert(aOutput, sMsgText)
-    insertStatsIfEnabled(aOutput, load, stats.strength, stats.nMultiplier, "Max: " .. stats.max)
+    insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
+    insertStatsIfEnabled(aOutput, stats.load, stats.strength, stats.nMultiplier, "Max: " .. stats.max)
 end
 
 function processUncarriedAndZeroWeight(aOutput, nodeCharSheet)
@@ -379,7 +379,7 @@ end
 function processVariantHeavilyEncumbered(aOutput, nodeCurrentCTActor, stats)
     local sMsgText = "'" .. ActorManager.getDisplayName(nodeCurrentCTActor) .. "' is heavily encumbered."
     table.insert(aOutput, sMsgText)
-    insertStatsIfEnabled(aOutput, load, stats.strength, stats.nMultiplier, "Heavy: " .. stats.heavy)
+    insertStatsIfEnabled(aOutput, stats.load, stats.strength, stats.nMultiplier, "Heavy: " .. stats.heavy)
     addHeavilyEncumberedEffect(nodeCurrentCTActor)
     if OptionsManager.isOption(ENCUMBRANCETRACKER_RULE_DETAIL, ON) then
         sMsgText = WITH_VARIANT_ENCUMBRANCE .. "if you carry weight in excess of 10 times your Strength score (pre-multiplier), up to your maximum carrying capacity, you are instead heavily encumbered, which means your speed drops by 20 feet and you have disadvantage on ability checks, attack rolls, and saving throws that use Strength, Dexterity, or Constitution."
@@ -417,7 +417,9 @@ function requestActivation(nodeCurrentCTActor, bSkipBell)
     CombatManager_requestActivation(nodeCurrentCTActor, bSkipBell)
 	if checkVerbosityOff() then return end
 
-    processEncumbranceForActor(nodeCurrentCTActor)
+    local aOutput = {}
+    processEncumbranceForActor(nodeCurrentCTActor, aOutput)
+    displayTableIfNonEmpty(aOutput)
 end
 
 function validateTableOrNew(aTable)
