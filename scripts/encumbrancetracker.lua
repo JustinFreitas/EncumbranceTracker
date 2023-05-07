@@ -83,7 +83,7 @@ function addEncumberedEffect(nodeCTEntry)
     if not nodeCTEntry then return end
 
     if not hasEncumberedEffect(nodeCTEntry) then
-        addEffect(nodeCTEntry, ENCUMBERED)
+        addEffect(nodeCTEntry, ENCUMBERED .. "; Speed 5 ft;")
     end
 end
 
@@ -91,7 +91,7 @@ function addHeavilyEncumberedEffect(nodeCTEntry)
     if not nodeCTEntry then return end
 
     if not hasHeavilyEncumberedEffect(nodeCTEntry) then
-        addEffect(nodeCTEntry, HEAVILY_ENCUMBERED)
+        addEffect(nodeCTEntry, HEAVILY_ENCUMBERED .. "; Speed -20 ft; DISCHK: strength, dexterity, constitution; DISSAV: strength, dexterity, constitution; DISATK;")
     end
 end
 
@@ -99,7 +99,7 @@ function addLightlyEncumberedEffect(nodeCTEntry)
     if not nodeCTEntry then return end
 
     if not hasLightlyEncumberedEffect(nodeCTEntry) then
-        addEffect(nodeCTEntry, LIGHTLY_ENCUMBERED)
+        addEffect(nodeCTEntry, LIGHTLY_ENCUMBERED .. "; Speed -10 ft;")
     end
 end
 
@@ -107,7 +107,7 @@ function addOverEncumberedEffect(nodeCTEntry)
     if not nodeCTEntry then return end
 
     if not hasOverEncumberedEffect(nodeCTEntry) then
-        addEffect(nodeCTEntry, OVER_ENCUMBERED)
+        addEffect(nodeCTEntry, OVER_ENCUMBERED .. "; Speed 5 ft; DISCHK: strength, dexterity, constitution; DISSAV: strength, dexterity, constitution; DISATK;")
     end
 end
 
@@ -205,22 +205,22 @@ function getNoEncumbranceMultiplierOrDefault(name, multiplier)
 end
 
 function hasEffect(nodeCTEntry, sEffect)
-    if not nodeCTEntry or not sEffect then return end
+    if not nodeCTEntry or not sEffect then return nil end
 
     local sEffPattern = ENCUMBRANCE_EFFECT_PATTERNS[sEffect]
     if sEffPattern == nil then
-        return false
+        return nil
     end
 
     for _,nodeEffect in pairs(DB.getChildren(nodeCTEntry, "effects")) do
 		if DB.getValue(nodeEffect, "label", ""):match(sEffPattern) then
             -- We matched the explicitly requested pattern, delete the unmatched others (mutually exclusive)
             RemoveEffects(nodeCTEntry, ENCUMBRANCE_EFFECT_PATTERNS, nodeEffect)
-			return true
+			return nodeEffect
 		end
 	end
 
-    return false
+    return nil
 end
 
 function hasEncumberedEffect(nodeCTEntry)
@@ -274,12 +274,7 @@ function matchAny(str, pattern_list)
 end
 
 function processChatCommand()
-    local aOutput = {}
-	for _,nodeCT in pairs(DB.getChildren(CombatManager.CT_LIST)) do
-        processEncumbranceForActor(nodeCT, aOutput)
-    end
-
-    displayTableIfNonEmpty(aOutput)
+    processEncumbranceForAllActors()
 end
 
 function processEncumbranceForActor(nodeCurrentCTActor, aOutput)
@@ -309,27 +304,51 @@ function processEncumbranceForActor(nodeCurrentCTActor, aOutput)
             processVariantLightlyEncumbered(aOutput, nodeCurrentCTActor, stats)
         elseif stats.load > -1 then
             processUnencumbered(aOutput, nodeCurrentCTActor, stats)
-        else
+        elseif aOutput ~= nil then
             sMsgText = "'" .. rCurrentActor.sName .. "' could not be analyzed for encumbrance."
             insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
         end
 
-        if OptionsManager.isOption(ENCUMBRANCETRACKER_UNCARRIED, ON)
-        or OptionsManager.isOption(ENCUMBRANCETRACKER_ZERO_WEIGHT, ON) then
-            processUncarriedAndZeroWeight(aOutput, nodeCharSheet)
+        if aOutput ~= nil then
+            if OptionsManager.isOption(ENCUMBRANCETRACKER_UNCARRIED, ON)
+            or OptionsManager.isOption(ENCUMBRANCETRACKER_ZERO_WEIGHT, ON) then
+                processUncarriedAndZeroWeight(aOutput, nodeCharSheet)
+            end
         end
     end
 end
 
+function processEncumbranceForAllActors(bSilent)
+    local aOutput
+    if not bSilent then
+        aOutput = {}
+    end
+
+    for _,nodeCT in pairs(DB.getChildren(CombatManager.CT_LIST)) do
+        processEncumbranceForActor(nodeCT, aOutput)
+    end
+
+    if bSilent then return end
+
+    displayTableIfNonEmpty(aOutput)
+end
+
 function processOverMaxEncumbrance(aOutput, nodeCurrentCTActor, stats)
+    removeAllEncumbranceEffects(nodeCurrentCTActor, hasOverEncumberedEffect(nodeCurrentCTActor))
+    if checkVariantEncumbrance() then
+        addOverEncumberedEffect(nodeCurrentCTActor)
+    else
+        addEncumberedEffect(nodeCurrentCTActor)
+    end
+
+    if aOutput == nil then return end
+
     local sMsgText
     local sDisplayName = ActorManager.getDisplayName(nodeCurrentCTActor)
     if checkVariantEncumbrance() then
         sMsgText = "'" .. sDisplayName .. "' is over encumbered."
-        addOverEncumberedEffect(nodeCurrentCTActor)
     else
         sMsgText = "'" .. sDisplayName .. "' is encumbered."
-        addEncumberedEffect(nodeCurrentCTActor)
     end
 
     insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
@@ -366,10 +385,9 @@ function processUncarriedAndZeroWeight(aOutput, nodeCharSheet)
 end
 
 function processUnencumbered(aOutput, nodeCurrentCTActor, stats)
-    local sMsgText
     removeAllEncumbranceEffects(nodeCurrentCTActor)
-    if checkVerbosityMax() then
-        sMsgText = "'" .. ActorManager.getDisplayName(nodeCurrentCTActor) .. "' is unencumbered."
+    if aOutput ~= nil and checkVerbosityMax() then
+        local sMsgText = "'" .. ActorManager.getDisplayName(nodeCurrentCTActor) .. "' is unencumbered."
         insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
         if checkVariantEncumbrance() then
             insertStatsIfEnabled(aOutput, stats.load, stats.strength, stats.nMultiplier, "Lightly: " .. stats.lightlyEncumbered)
@@ -380,10 +398,13 @@ function processUnencumbered(aOutput, nodeCurrentCTActor, stats)
 end
 
 function processVariantHeavilyEncumbered(aOutput, nodeCurrentCTActor, stats)
+    removeAllEncumbranceEffects(nodeCurrentCTActor, hasHeavilyEncumberedEffect(nodeCurrentCTActor))
+    addHeavilyEncumberedEffect(nodeCurrentCTActor)
+    if aOutput == nil then return end
+
     local sMsgText = "'" .. ActorManager.getDisplayName(nodeCurrentCTActor) .. "' is heavily encumbered."
     insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
     insertStatsIfEnabled(aOutput, stats.load, stats.strength, stats.nMultiplier, "Heavy: " .. stats.heavy)
-    addHeavilyEncumberedEffect(nodeCurrentCTActor)
     if OptionsManager.isOption(ENCUMBRANCETRACKER_RULE_DETAIL, ON) then
         sMsgText = WITH_VARIANT_ENCUMBRANCE .. "if you carry weight in excess of 10 times your Strength score (pre-multiplier), up to your maximum carrying capacity, you are instead heavily encumbered, which means your speed drops by 20 feet and you have disadvantage on ability checks, attack rolls, and saving throws that use Strength, Dexterity, or Constitution."
         table.insert(aOutput, sMsgText)
@@ -391,20 +412,23 @@ function processVariantHeavilyEncumbered(aOutput, nodeCurrentCTActor, stats)
 end
 
 function processVariantLightlyEncumbered(aOutput, nodeCurrentCTActor, stats)
+    removeAllEncumbranceEffects(nodeCurrentCTActor, hasLightlyEncumberedEffect(nodeCurrentCTActor))
+    addLightlyEncumberedEffect(nodeCurrentCTActor)
+    if aOutput == nil then return end
+
     local sMsgText = "'" .. ActorManager.getDisplayName(nodeCurrentCTActor) .. "' is lightly encumbered."
     insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
     insertStatsIfEnabled(aOutput, stats.load, stats.strength, stats.nMultiplier, "Lightly: " .. stats.lightlyEncumbered)
-    addLightlyEncumberedEffect(nodeCurrentCTActor)
     if OptionsManager.isOption(ENCUMBRANCETRACKER_RULE_DETAIL, ON) then
         sMsgText = WITH_VARIANT_ENCUMBRANCE .. "if you carry weight in excess of 5 times your Strength score (pre-multiplier), you are encumbered, which means your speed drops by 10 feet."
         table.insert(aOutput, sMsgText)
     end
 end
 
-function removeAllEncumbranceEffects(nodeCTEntry)
+function removeAllEncumbranceEffects(nodeCTEntry, nodeEffectToKeep)
     if not nodeCTEntry then return end
 
-    RemoveEffects(nodeCTEntry, ENCUMBRANCE_EFFECT_PATTERNS)
+    RemoveEffects(nodeCTEntry, ENCUMBRANCE_EFFECT_PATTERNS, nodeEffectToKeep)
 end
 
 function RemoveEffects(nodeCTEntry, aEffects, nodeEffectToKeep)
@@ -420,6 +444,7 @@ function requestActivation(nodeCurrentCTActor, bSkipBell)
     CombatManager_requestActivation(nodeCurrentCTActor, bSkipBell)
 	if checkVerbosityOff() then return end
 
+    processEncumbranceForAllActors(true)
     local aOutput = {}
     processEncumbranceForActor(nodeCurrentCTActor, aOutput)
     displayTableIfNonEmpty(aOutput)
