@@ -263,6 +263,10 @@ function insertStatsIfEnabled(aOutput, load, strength, multiplier, levelStat)
     end
 end
 
+function isEncumbranceTrackerDisabledForActor(nodeCTActor)
+    return nodeCTActor and DB.getText(nodeCTActor, "speed.special", ""):lower():match("no encumbrancetracker") ~= nil
+end
+
 function matchAny(str, pattern_list)
     for _,pattern in pairs(pattern_list) do
         if string.match(str, pattern) then
@@ -284,7 +288,7 @@ function processEncumbranceForActor(nodeCurrentCTActor, aOutput)
     if ActorManager.isPC(nodeCurrentCTActor) then
         local nMultiplier = getEncumbranceMultiplier(nodeCharSheet)
         local strength = DB.getValue(nodeCharSheet, "abilities.strength.score", -1)
-        if nMultiplier < 0 or strength < 0 then return end
+        if nMultiplier < 0 or isEncumbranceTrackerDisabledForActor(nodeCharSheet) then return end
 
         local stats = {
             nMultiplier = nMultiplier,
