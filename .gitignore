@@ -1,0 +1,5 @@
+scripts/.luacheckrc
+build/out/EncumbranceTracker.zip
+build/out/EncumbranceTracker.ext
+.vscode/settings.json
+readme.txt
