@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 <root version="3.3" release="8.1|CoreRPG:4.1">
-	<announcement text="EncumbranceTracker v1.1 FGC/FGU 5E, 5/6/23\r2023 Justin Freitas" font="emotefont" icon="encumbrance_icon" />
+	<announcement text="EncumbranceTracker v1.1 FGC/FGU 5E\r2023 Justin Freitas, 5/6/23" font="emotefont" icon="encumbrance_icon" />
 	<properties>
 		<name>Feature: EncumbranceTracker</name>
 		<version>1.1</version>
