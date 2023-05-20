@@ -13,10 +13,7 @@ GM EncumbranceTracker Chat Commands:
 /et or /encumbrance - This will run the encumbrance analysis on all of the PCs in the Combat Tracker, even if combat is not active.
 
 Features:
-- TODO
-
-Future Enhancements:
-- TODO
+- Each turn of combat (or whichever CT actor is clicked on in the left turn ordering by the DM), the entire list of CT actors is processed for PC encumbrance.  If a PC gets classified at a particular level of encumbrance, an effect will be added to the CT actor to designate it as such.  Some of these effects will have automation syntax attached to them, when possible.  The level of summary verbosity can be controlled by some settings in the FG Options.  These include options like the display of rule help from the SRD for variant encumbrance details.
 
 
 Changelist:
