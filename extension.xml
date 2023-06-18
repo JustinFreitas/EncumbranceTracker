@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 <root version="3.3" release="8.1|CoreRPG:4.1">
-	<announcement text="EncumbranceTracker v1.1 FGC/FGU 5E\r2023 Justin Freitas, 5/6/23" font="emotefont" icon="encumbrance_icon" />
+	<announcement text="EncumbranceTracker v1.2 FGC/FGU 5E\r2023 Justin Freitas, 6/17/23" font="emotefont" icon="encumbrance_icon" />
 	<properties>
 		<name>Feature: EncumbranceTracker</name>
-		<version>1.1</version>
+		<version>1.2</version>
 		<loadorder>989</loadorder>
 		<author>Justin Freitas</author>
 		<description>Tracks the current encumbrance load vs the encumbrance calculations based off of the PC's strength.</description>
@@ -23,6 +23,7 @@
 		<string name="option_label_ENCUMBRANCETRACKER_RULE_DETAIL">Chat: Show rule detail</string>
 		<string name="option_label_ENCUMBRANCETRACKER_STATS">Chat: Show stats</string>
 		<string name="option_label_ENCUMBRANCETRACKER_UNCARRIED">Chat: Show uncarried items count</string>
+		<string name="option_label_ENCUMBRANCETRACKER_USE_EFFECTS">CT: Use Effects</string>
 		<string name="option_label_ENCUMBRANCETRACKER_VERBOSE">Chat: Extension Verbosity</string>
 		<string name="option_label_ENCUMBRANCETRACKER_ZERO_WEIGHT">Chat: Show zero weight count</string>
 	</base>

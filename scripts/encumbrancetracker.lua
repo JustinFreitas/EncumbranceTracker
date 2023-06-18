@@ -9,6 +9,7 @@ ENCUMBRANCETRACKER_MULTIPLIER_EQUINE = "ENCUMBRANCETRACKER_MULTIPLIER_EQUINE"
 ENCUMBRANCETRACKER_RULE_DETAIL = "ENCUMBRANCETRACKER_RULE_DETAIL"
 ENCUMBRANCETRACKER_STATS = "ENCUMBRANCETRACKER_STATS"
 ENCUMBRANCETRACKER_UNCARRIED = "ENCUMBRANCETRACKER_UNCARRIED"
+ENCUMBRANCETRACKER_USE_EFFECTS = "ENCUMBRANCETRACKER_USE_EFFECTS"
 ENCUMBRANCETRACKER_VERBOSE = "ENCUMBRANCETRACKER_VERBOSE"
 ENCUMBRANCETRACKER_ZERO_WEIGHT = "ENCUMBRANCETRACKER_ZERO_WEIGHT"
 HEAVILY = "Heavily"
@@ -50,6 +51,8 @@ function onInit()
     { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
     OptionsManager.registerOption2(ENCUMBRANCETRACKER_UNCARRIED, false, option_header, "option_label_ENCUMBRANCETRACKER_UNCARRIED", option_entry_cycler,
     { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
+    OptionsManager.registerOption2(ENCUMBRANCETRACKER_USE_EFFECTS, false, option_header, "option_label_ENCUMBRANCETRACKER_USE_EFFECTS", option_entry_cycler,
+    { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
     OptionsManager.registerOption2(ENCUMBRANCETRACKER_MULTIPLIER_BEAR, false, option_header, "option_label_ENCUMBRANCETRACKER_MULTIPLIER_BEAR", option_entry_cycler,
     { labels = option_val_on, values = ON, baselabel = "option_val_off", baseval = OFF, default = OFF })
     OptionsManager.registerOption2(ENCUMBRANCETRACKER_MULTIPLIER_EQUINE, false, option_header, "option_label_ENCUMBRANCETRACKER_MULTIPLIER_EQUINE", option_entry_cycler,
@@ -76,7 +79,9 @@ function addEffect(nodeCTEntry, sEffect)
 		nGMOnly = 0
 	}
 
-    EffectManager.addEffect("", "", nodeCTEntry, rEffect, true)
+    if checkUseEffects() then
+        EffectManager.addEffect("", "", nodeCTEntry, rEffect, true)
+    end
 end
 
 function addEncumberedEffect(nodeCTEntry)
@@ -116,6 +121,10 @@ function checkNewEncumbranceFGU()
 	if nMajor >= 5 then return true end
 	if nMajor == 4 and nMinor >= 2 then return true end
 	return nMajor == 4 and nMinor == 1 and nPatch >= 14
+end
+
+function checkUseEffects()
+    return OptionsManager.isOption(ENCUMBRANCETRACKER_USE_EFFECTS, ON)
 end
 
 function checkVariantEncumbrance()
