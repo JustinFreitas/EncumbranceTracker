@@ -2,7 +2,7 @@
 
 https://github.com/JustinFreitas/EncumbranceTracker
 
-EncumbranceTracker v1.1, by Justin Freitas
+EncumbranceTracker v1.2, by Justin Freitas
 
 ReadMe and Usage Notes
 
