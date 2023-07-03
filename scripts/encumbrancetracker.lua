@@ -146,16 +146,14 @@ function displayChatMessage(sFormattedText, bSecret)
 	local msg = {
         font = "msgfont",
         icon = "encumbrance_icon",
-        secret = bSecret,
+        secret = false, -- true to show the crossed out eye icon
         text = sFormattedText
     }
 
 	-- deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
 	if bSecret then
-        msg.secret = true
 		Comm.addChatMessage(msg)
 	else
-        msg.secret = false
 		Comm.deliverChatMessage(msg, "")
 	end
 end
