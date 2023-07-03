@@ -2,7 +2,7 @@
 
 https://github.com/JustinFreitas/EncumbranceTracker
 
-EncumbranceTracker v1.2, by Justin Freitas
+EncumbranceTracker v1.2.1, by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -20,3 +20,4 @@ Changelist:
 - v1.0 - Initial version.
 - v1.1 - Better turn order firing in combat.  Formatting improvements.  Bug fixes.  Strength less than zero filtered out.
 - v1.2 - Added an option to disable the use of effects, if desired.  Defaults to enabled/on.
+- v1.2.1 - Updated icon using Sir Motte's template for their dark theme.
