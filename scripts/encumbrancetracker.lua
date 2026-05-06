@@ -36,6 +36,14 @@ ENCUMBRANCE_EFFECT_PATTERNS = {
 
 local CombatManager_requestActivation = nil
 
+-- Helper to safely get an actor from a node/string, preferring the modern getActor method.
+local function getActorSafe(v)
+    if ActorManager.getActor then
+        return ActorManager.getActor(v)
+    end
+    return ActorManager.resolveActor(v)
+end
+
 function onInit()
 	local option_header = "option_header_encumbrancetracker"
 	local option_val_off = "option_val_off"
@@ -44,21 +52,23 @@ function onInit()
 	OptionsManager.registerOption2(ENCUMBRANCETRACKER_VERBOSE, false, option_header, "option_label_ENCUMBRANCETRACKER_VERBOSE", option_entry_cycler,
 	{ baselabel = "option_val_max", baseval = MAX, labels = "option_val_standard|" .. option_val_off, values = "standard|" .. OFF, default = MAX })
     OptionsManager.registerOption2(ENCUMBRANCETRACKER_RULE_DETAIL, false, option_header, "option_label_ENCUMBRANCETRACKER_RULE_DETAIL", option_entry_cycler,
-    { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
+    { labels = option_val_off, values = OFF, baselabel = option_val_on, baseval = ON, default = ON })
     OptionsManager.registerOption2(ENCUMBRANCETRACKER_STATS, false, option_header, "option_label_ENCUMBRANCETRACKER_STATS", option_entry_cycler,
-    { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
+    { labels = option_val_off, values = OFF, baselabel = option_val_on, baseval = ON, default = ON })
     OptionsManager.registerOption2(ENCUMBRANCETRACKER_ZERO_WEIGHT, false, option_header, "option_label_ENCUMBRANCETRACKER_ZERO_WEIGHT", option_entry_cycler,
-    { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
+    { labels = option_val_off, values = OFF, baselabel = option_val_on, baseval = ON, default = ON })
     OptionsManager.registerOption2(ENCUMBRANCETRACKER_UNCARRIED, false, option_header, "option_label_ENCUMBRANCETRACKER_UNCARRIED", option_entry_cycler,
-    { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
+    { labels = option_val_off, values = OFF, baselabel = option_val_on, baseval = ON, default = ON })
     OptionsManager.registerOption2(ENCUMBRANCETRACKER_USE_EFFECTS, false, option_header, "option_label_ENCUMBRANCETRACKER_USE_EFFECTS", option_entry_cycler,
-    { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
+    { labels = option_val_off, values = OFF, baselabel = option_val_on, baseval = ON, default = ON })
     OptionsManager.registerOption2(ENCUMBRANCETRACKER_MULTIPLIER_BEAR, false, option_header, "option_label_ENCUMBRANCETRACKER_MULTIPLIER_BEAR", option_entry_cycler,
-    { labels = option_val_on, values = ON, baselabel = "option_val_off", baseval = OFF, default = OFF })
+    { labels = option_val_on, values = ON, baselabel = option_val_off, baseval = OFF, default = OFF })
     OptionsManager.registerOption2(ENCUMBRANCETRACKER_MULTIPLIER_EQUINE, false, option_header, "option_label_ENCUMBRANCETRACKER_MULTIPLIER_EQUINE", option_entry_cycler,
-    { labels = option_val_on, values = ON, baselabel = "option_val_off", baseval = OFF, default = OFF })
+    { labels = option_val_on, values = ON, baselabel = option_val_off, baseval = OFF, default = OFF })
     OptionsManager.registerOption2(ENCUMBRANCETRACKER_MULTIPLIER_BURDEN, false, option_header, "option_label_ENCUMBRANCETRACKER_MULTIPLIER_BURDEN", option_entry_cycler,
-    { labels = option_val_on, values = ON, baselabel = "option_val_off", baseval = OFF, default = OFF })
+    { labels = option_val_on, values = ON, baselabel = option_val_off, baseval = OFF, default = OFF })
+    -- TODO: Add a 'Show to Players' option.
+    -- TODO: Add a chat frame option.
 
     IS_FGU = checkNewEncumbranceFGU()
     USER_ISHOST = User.isHost()
@@ -289,7 +299,7 @@ function processChatCommand()
 end
 
 function processEncumbranceForActor(nodeCurrentCTActor, aOutput)
-	local rCurrentActor = ActorManager.resolveActor(nodeCurrentCTActor)
+	local rCurrentActor = getActorSafe(nodeCurrentCTActor)
     local nodeCharSheet = DB.findNode(rCurrentActor.sCreatureNode)
 
     if ActorManager.isPC(nodeCurrentCTActor) then
@@ -417,7 +427,7 @@ function processVariantHeavilyEncumbered(aOutput, nodeCurrentCTActor, stats)
     insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
     insertStatsIfEnabled(aOutput, stats.load, stats.strength, stats.nMultiplier, "Heavy: " .. stats.heavy)
     if OptionsManager.isOption(ENCUMBRANCETRACKER_RULE_DETAIL, ON) then
-        sMsgText = WITH_VARIANT_ENCUMBRANCE .. "if you carry weight in excess of 10 times your Strength score (pre-multiplier), up to your maximum carrying capacity, you are instead heavily encumbered, which means your speed drops by 20 feet and you have disadvantage on ability checks, attack rolls, and saving throws that use Strength, Dexterity, or Constitution."
+        sMsgText = WITH_VARIANT_ENCUMBERANCE .. "if you carry weight in excess of 10 times your Strength score (pre-multiplier), up to your maximum carrying capacity, you are instead heavily encumbered, which means your speed drops by 20 feet and you have disadvantage on ability checks, attack rolls, and saving throws that use Strength, Dexterity, or Constitution."
         table.insert(aOutput, sMsgText)
     end
 end
@@ -431,7 +441,7 @@ function processVariantLightlyEncumbered(aOutput, nodeCurrentCTActor, stats)
     insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
     insertStatsIfEnabled(aOutput, stats.load, stats.strength, stats.nMultiplier, "Lightly: " .. stats.lightlyEncumbered)
     if OptionsManager.isOption(ENCUMBRANCETRACKER_RULE_DETAIL, ON) then
-        sMsgText = WITH_VARIANT_ENCUMBRANCE .. "if you carry weight in excess of 5 times your Strength score (pre-multiplier), you are encumbered, which means your speed drops by 10 feet."
+        sMsgText = WITH_VARIANT_ENCUMBERANCE .. "if you carry weight in excess of 5 times your Strength score (pre-multiplier), you are encumbered, which means your speed drops by 10 feet."
         table.insert(aOutput, sMsgText)
     end
 end
