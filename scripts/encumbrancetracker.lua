@@ -36,12 +36,47 @@ ENCUMBRANCE_EFFECT_PATTERNS = {
 
 local CombatManager_requestActivation = nil
 
+-- Helper to safely check if a string is blank, preferring the modern StringManager method.
+local function isBlankSafe(s)
+    if StringManager.isBlank then
+        return StringManager.isBlank(s)
+    end
+    if type(s) ~= "string" then
+        return false
+    end
+    return (string.gsub(s, "%s+", "") == "")
+end
+
 -- Helper to safely get an actor from a node/string, preferring the modern getActor method.
 local function getActorSafe(v)
     if ActorManager.getActor then
         return ActorManager.getActor(v)
     end
     return ActorManager.resolveActor(v)
+end
+
+-- Helper to safely check for effects, preferring the modern CoreRPG or 5E-specific EffectManager if available.
+local function hasEffectSafe(rActor, sEffect, rTarget, bTargetedOnly)
+    if EffectManager.hasEffect then
+        return EffectManager.hasEffect(rActor, sEffect, rTarget, bTargetedOnly)
+    end
+    if EffectManager5E and EffectManager5E.hasEffect then
+        return EffectManager5E.hasEffect(rActor, sEffect, rTarget, bTargetedOnly)
+    end
+    return EffectManager.hasEffect(rActor, sEffect)
+end
+
+-- Helper to safely fetch encumbrance multiplier from the ruleset.
+local function getEncumbranceMultSafe(nodeChar)
+    if IS_FGU then
+        if CharEncumbranceManager5E and CharEncumbranceManager5E.getEncumbranceMult then
+            return CharEncumbranceManager5E.getEncumbranceMult(nodeChar)
+        end
+    end
+    if CharManager and CharManager.getEncumbranceMult then
+        return CharManager.getEncumbranceMult(nodeChar)
+    end
+    return 1
 end
 
 function onInit()
@@ -151,7 +186,7 @@ end
 
 -- Puts a message in chat that is broadcast to everyone attached to the host (including the host) if bSecret is true, otherwise local only.
 function displayChatMessage(sFormattedText, bSecret)
-	if not sFormattedText then return end
+	if isBlankSafe(sFormattedText) then return end
 
 	local msg = {
         font = "msgfont",
@@ -177,13 +212,7 @@ function displayTableIfNonEmpty(aTable)
 end
 
 function getEncumbranceMultiplier(nodeChar)
-	local nMultiplier
-    -- TODO: Getting from the ruleset multiplier will automatically account for Equine Build, Aspect of the Beast: Bear, and Beast of Burden (assuming Equine Build ext update).
-    if IS_FGU then
-        nMultiplier = CharEncumbranceManager5E.getEncumbranceMult(nodeChar)
-    else
-        nMultiplier = CharManager.getEncumbranceMult(nodeChar)
-    end
+	local nMultiplier = getEncumbranceMultSafe(nodeChar)
 
 	for _, nodeTrait in pairs(DB.getChildren(nodeChar, "traitlist")) do
 		local name = DB.getValue(nodeTrait, "name", ""):lower()
@@ -462,7 +491,9 @@ function RemoveEffects(nodeCTEntry, aEffects, nodeEffectToKeep)
 end
 
 function requestActivation(nodeCurrentCTActor, bSkipBell)
-    CombatManager_requestActivation(nodeCurrentCTActor, bSkipBell)
+    if CombatManager_requestActivation then
+        CombatManager_requestActivation(nodeCurrentCTActor, bSkipBell)
+    end
 	if checkVerbosityOff() then return end
 
     processEncumbranceForAllActors(true)
