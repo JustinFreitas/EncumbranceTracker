@@ -427,7 +427,7 @@ function processVariantHeavilyEncumbered(aOutput, nodeCurrentCTActor, stats)
     insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
     insertStatsIfEnabled(aOutput, stats.load, stats.strength, stats.nMultiplier, "Heavy: " .. stats.heavy)
     if OptionsManager.isOption(ENCUMBRANCETRACKER_RULE_DETAIL, ON) then
-        sMsgText = WITH_VARIANT_ENCUMBERANCE .. "if you carry weight in excess of 10 times your Strength score (pre-multiplier), up to your maximum carrying capacity, you are instead heavily encumbered, which means your speed drops by 20 feet and you have disadvantage on ability checks, attack rolls, and saving throws that use Strength, Dexterity, or Constitution."
+        sMsgText = WITH_VARIANT_ENCUMBRANCE .. "if you carry weight in excess of 10 times your Strength score (pre-multiplier), up to your maximum carrying capacity, you are instead heavily encumbered, which means your speed drops by 20 feet and you have disadvantage on ability checks, attack rolls, and saving throws that use Strength, Dexterity, or Constitution."
         table.insert(aOutput, sMsgText)
     end
 end
@@ -441,7 +441,7 @@ function processVariantLightlyEncumbered(aOutput, nodeCurrentCTActor, stats)
     insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
     insertStatsIfEnabled(aOutput, stats.load, stats.strength, stats.nMultiplier, "Lightly: " .. stats.lightlyEncumbered)
     if OptionsManager.isOption(ENCUMBRANCETRACKER_RULE_DETAIL, ON) then
-        sMsgText = WITH_VARIANT_ENCUMBERANCE .. "if you carry weight in excess of 5 times your Strength score (pre-multiplier), you are encumbered, which means your speed drops by 10 feet."
+        sMsgText = WITH_VARIANT_ENCUMBRANCE .. "if you carry weight in excess of 5 times your Strength score (pre-multiplier), you are encumbered, which means your speed drops by 10 feet."
         table.insert(aOutput, sMsgText)
     end
 end
