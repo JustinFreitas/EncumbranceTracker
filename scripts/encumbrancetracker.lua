@@ -55,17 +55,6 @@ local function getActorSafe(v)
     return ActorManager.resolveActor(v)
 end
 
--- Helper to safely check for effects, preferring the modern CoreRPG or 5E-specific EffectManager if available.
-local function hasEffectSafe(rActor, sEffect, rTarget, bTargetedOnly)
-    if EffectManager.hasEffect then
-        return EffectManager.hasEffect(rActor, sEffect, rTarget, bTargetedOnly)
-    end
-    if EffectManager5E and EffectManager5E.hasEffect then
-        return EffectManager5E.hasEffect(rActor, sEffect, rTarget, bTargetedOnly)
-    end
-    return EffectManager.hasEffect(rActor, sEffect)
-end
-
 -- Helper to safely fetch encumbrance multiplier from the ruleset.
 local function getEncumbranceMultSafe(nodeChar)
     if IS_FGU then
@@ -329,12 +318,18 @@ end
 
 function processEncumbranceForActor(nodeCurrentCTActor, aOutput)
 	local rCurrentActor = getActorSafe(nodeCurrentCTActor)
+    if not rCurrentActor or not rCurrentActor.sCreatureNode then return end
     local nodeCharSheet = DB.findNode(rCurrentActor.sCreatureNode)
 
     if ActorManager.isPC(nodeCurrentCTActor) then
         local nMultiplier = getEncumbranceMultiplier(nodeCharSheet)
         local strength = DB.getValue(nodeCharSheet, "abilities.strength.score", -1)
-        if nMultiplier < 0 or isEncumbranceTrackerDisabledForActor(nodeCharSheet) then return end
+        -- A multiplier of 0 (e.g. the "No Encumbrance" trait) means encumbrance does not apply;
+        -- clear any stale effects and skip analysis rather than treating load as over-max.
+        if nMultiplier <= 0 or isEncumbranceTrackerDisabledForActor(nodeCharSheet) then
+            removeAllEncumbranceEffects(nodeCurrentCTActor)
+            return
+        end
 
         local stats = {
             nMultiplier = nMultiplier,
@@ -354,9 +349,13 @@ function processEncumbranceForActor(nodeCurrentCTActor, aOutput)
             processVariantLightlyEncumbered(aOutput, nodeCurrentCTActor, stats)
         elseif stats.load > -1 then
             processUnencumbered(aOutput, nodeCurrentCTActor, stats)
-        elseif aOutput ~= nil then
-            sMsgText = "'" .. rCurrentActor.sName .. "' could not be analyzed for encumbrance."
-            insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
+        else
+            -- Load could not be determined; clear any stale effects so they don't linger.
+            removeAllEncumbranceEffects(nodeCurrentCTActor)
+            if aOutput ~= nil then
+                sMsgText = "'" .. rCurrentActor.sName .. "' could not be analyzed for encumbrance."
+                insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
+            end
         end
 
         if aOutput ~= nil then

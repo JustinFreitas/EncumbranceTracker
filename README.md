@@ -2,7 +2,7 @@
 
 https://github.com/JustinFreitas/EncumbranceTracker
 
-EncumbranceTracker v1.2.2, by Justin Freitas
+EncumbranceTracker v1.6, by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -22,3 +22,6 @@ Changelist:
 - v1.2 - Added an option to disable the use of effects, if desired.  Defaults to enabled/on.
 - v1.2.1 - Updated icon using Sir Motte's template for their dark theme.  Got rid of the crossed out eye icon in the chat message to save space.
 - v1.2.2 - Icon update, 42px.
+- v1.4 - Modernized API calls with getActorSafe helper and fixed file corruption.
+- v1.5 - Upgraded to modern CoreRPG native functions (StringManager.isBlank) and added safe helper patterns (getEncumbranceMultSafe). Fixed WITH_VARIANT_ENCUMBRANCE typo crash.
+- v1.6 - Bug fixes: guard against nil actors, treat the "No Encumbrance" trait (0 multiplier) as exempt rather than over-encumbered, and clear stale encumbrance effects when an actor can no longer be analyzed or is exempt. Removed dead code and cleaned up the lint baseline.
