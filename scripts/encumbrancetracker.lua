@@ -57,10 +57,8 @@ end
 
 -- Helper to safely fetch encumbrance multiplier from the ruleset.
 local function getEncumbranceMultSafe(nodeChar)
-    if IS_FGU then
-        if CharEncumbranceManager5E and CharEncumbranceManager5E.getEncumbranceMult then
-            return CharEncumbranceManager5E.getEncumbranceMult(nodeChar)
-        end
+    if CharEncumbranceManager5E and CharEncumbranceManager5E.getEncumbranceMult then
+        return CharEncumbranceManager5E.getEncumbranceMult(nodeChar)
     end
     if CharManager and CharManager.getEncumbranceMult then
         return CharManager.getEncumbranceMult(nodeChar)
@@ -94,7 +92,6 @@ function onInit()
     -- TODO: Add a 'Show to Players' option.
     -- TODO: Add a chat frame option.
 
-    IS_FGU = checkNewEncumbranceFGU()
     USER_ISHOST = User.isHost()
 
 	if USER_ISHOST then
@@ -150,12 +147,7 @@ function addOverEncumberedEffect(nodeCTEntry)
     end
 end
 
-function checkNewEncumbranceFGU()
-	local nMajor, nMinor, nPatch = Interface.getVersion()
-	if nMajor >= 5 then return true end
-	if nMajor == 4 and nMinor >= 2 then return true end
-	return nMajor == 4 and nMinor == 1 and nPatch >= 14
-end
+
 
 function checkUseEffects()
     return OptionsManager.isOption(ENCUMBRANCETRACKER_USE_EFFECTS, ON)

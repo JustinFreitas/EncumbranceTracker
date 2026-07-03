@@ -219,8 +219,7 @@ async function runTests() {
         }
     }
 
-    // --- TEST 1: checkNewEncumbranceFGU (FGU check version) ---
-    await runAssert("checkNewEncumbranceFGU()", true, "return checkNewEncumbranceFGU()");
+
 
     // --- TEST 2: checkVariantEncumbrance ---
     await runAssert("checkVariantEncumbrance() default variant", true, "return checkVariantEncumbrance()");
