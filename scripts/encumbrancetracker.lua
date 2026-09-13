@@ -15,6 +15,7 @@ ENCUMBRANCETRACKER_ZERO_WEIGHT = "ENCUMBRANCETRACKER_ZERO_WEIGHT"
 HEAVILY = "Heavily"
 HEAVILY_ENCUMBERED = HEAVILY .. " " .. ENCUMBERED
 HEAVILY_ENCUMBERED_PATTERN = "^%W*".. "[hH][eE][aA][vV][iI][lL][yY]" .. "%W+" .. ENCUMBERED_PATTERN_RAW
+IS_FGC = false
 IS_FGU = true
 LIGHTLY = "Lightly"
 LIGHTLY_ENCUMBERED = LIGHTLY .. " " .. ENCUMBERED
@@ -47,8 +48,30 @@ local function isBlankSafe(s)
     return (string.gsub(s, "%s+", "") == "")
 end
 
--- Helper to safely get an actor from a node/string, preferring the modern getActor method.
-local function getActorSafe(v)
+function checkFGC()
+    if UtilityManager and UtilityManager.isClientFGU then
+        return not UtilityManager.isClientFGU()
+    end
+    if Session and Session.VersionMajor then
+        return Session.VersionMajor < 4
+    end
+    if Interface and Interface.getVersion then
+        local sVersion = tostring(Interface.getVersion() or "")
+        local sMajor = sVersion:match("^(%d+)")
+        local nMajor = tonumber(sMajor) or 0
+        return nMajor < 4
+    end
+    return false
+end
+
+-- Helper to safely get an actor from a node/string, preferring the modern getActor method on FGU and resolveActor on FGC.
+-- Note: In FGC, ActorManager.getActor is a legacy 2-argument deprecated function (sActorOldType, v)
+-- that returns resolveActor(v). Calling it with 1 argument passes v as nil, returning nil.
+function getActorSafe(v)
+    if not v then return nil end
+    if IS_FGC or checkFGC() then
+        return ActorManager.resolveActor(v)
+    end
     if ActorManager.getActor then
         return ActorManager.getActor(v)
     end
@@ -92,11 +115,15 @@ function onInit()
     -- TODO: Add a 'Show to Players' option.
     -- TODO: Add a chat frame option.
 
-    USER_ISHOST = User.isHost()
+    IS_FGC = checkFGC()
+    IS_FGU = not IS_FGC
+    USER_ISHOST = (Session and Session.IsHost) or (User and User.isHost and User.isHost()) or false
 
 	if USER_ISHOST then
-        CombatManager_requestActivation = CombatManager.requestActivation
-        CombatManager.requestActivation = requestActivation
+        if CombatManager.requestActivation ~= requestActivation then
+            CombatManager_requestActivation = CombatManager.requestActivation
+            CombatManager.requestActivation = requestActivation
+        end
         Comm.registerSlashHandler("et", processChatCommand)
         Comm.registerSlashHandler("encumbrance", processChatCommand)
     end
@@ -309,9 +336,11 @@ function processChatCommand()
 end
 
 function processEncumbranceForActor(nodeCurrentCTActor, aOutput)
+    if not nodeCurrentCTActor then return end
 	local rCurrentActor = getActorSafe(nodeCurrentCTActor)
-    if not rCurrentActor or not rCurrentActor.sCreatureNode then return end
+    if not rCurrentActor or not rCurrentActor.sCreatureNode or rCurrentActor.sCreatureNode == "" then return end
     local nodeCharSheet = DB.findNode(rCurrentActor.sCreatureNode)
+    if not nodeCharSheet then return end
 
     if ActorManager.isPC(nodeCurrentCTActor) then
         local nMultiplier = getEncumbranceMultiplier(nodeCharSheet)

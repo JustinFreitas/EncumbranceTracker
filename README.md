@@ -2,7 +2,7 @@
 
 https://github.com/JustinFreitas/EncumbranceTracker
 
-EncumbranceTracker v1.6, by Justin Freitas
+EncumbranceTracker v1.6.1, by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -25,3 +25,4 @@ Changelist:
 - v1.4 - Modernized API calls with getActorSafe helper and fixed file corruption.
 - v1.5 - Upgraded to modern CoreRPG native functions (StringManager.isBlank) and added safe helper patterns (getEncumbranceMultSafe). Fixed WITH_VARIANT_ENCUMBRANCE typo crash.
 - v1.6 - Bug fixes: guard against nil actors, treat the "No Encumbrance" trait (0 multiplier) as exempt rather than over-encumbered, and clear stale encumbrance effects when an actor can no longer be analyzed or is exempt. Removed dead code and cleaned up the lint baseline.
+- v1.6.1 - Restore dual FGC/FGU compatibility: robust `checkFGC()` version detection handling Lua 5.1 string returns, route `getActorSafe()` to `ActorManager.resolveActor()` on FGC to fix nil actor returns, nil-checks for unlinked or empty CT entries in `processEncumbranceForActor`, and added `/reload` idempotency guard to `CombatManager.requestActivation`.

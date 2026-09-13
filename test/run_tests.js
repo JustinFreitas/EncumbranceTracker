@@ -9,7 +9,7 @@ async function runTests() {
     const lua = await luaFactory.createEngine();
 
     // 1. Mock FGU environment globals
-    console.log("Mocking FGU environment globals...");
+    console.log("Mocking FGU/FGC environment globals...");
     
     await lua.doString(`
         Interface = {}
@@ -21,9 +21,25 @@ async function runTests() {
         EffectManager = {}
         StringManager = {}
         User = {}
+        UtilityManager = {}
+        Session = { IsHost = true, VersionMajor = 4 }
         
         -- Mock Interface
-        function Interface.getVersion() return 4, 2, 0 end
+        local major, minor, patch = 4, 2, 0
+        local sVersionOverride = nil
+        function Interface.getVersion()
+            if sVersionOverride ~= nil then
+                return sVersionOverride
+            end
+            return major, minor, patch
+        end
+        function Interface.setVersion(ma, mi, pa)
+            sVersionOverride = nil
+            major, minor, patch = ma, mi, pa
+        end
+        function Interface.setVersionString(s)
+            sVersionOverride = s
+        end
 
         -- Mock User
         function User.isHost() return true end
@@ -69,7 +85,16 @@ async function runTests() {
 
         -- Mock CombatManager
         CombatManager.CT_LIST = "combattracker"
-        function CombatManager.requestActivation() end
+        local nActivationCalls = 0
+        function CombatManager.requestActivation(nodeCT, bSkip)
+            nActivationCalls = nActivationCalls + 1
+        end
+        function CombatManager.getActivationCalls()
+            return nActivationCalls
+        end
+        function CombatManager.resetActivationCalls()
+            nActivationCalls = 0
+        end
 
         -- Mock Database structure
         dbData = {}
@@ -79,6 +104,11 @@ async function runTests() {
         end
         
         function DB.getValue(node, field, default)
+            -- If node is an effect mock
+            if type(node) == "table" and node.label and field == "label" then
+                return node.label
+            end
+
             local nodePath = ""
             if type(node) == "table" and node.path then
                 nodePath = node.path
@@ -98,6 +128,7 @@ async function runTests() {
         end
 
         function DB.findNode(nodePath)
+            if not nodePath or nodePath == "" then return nil end
             if type(nodePath) == "table" then return nodePath end
             return { path = nodePath }
         end
@@ -115,7 +146,14 @@ async function runTests() {
                 sName = "Mock Hero"
             }
         end
+        function ActorManager.resolveActor(nodeCT)
+            return {
+                sCreatureNode = "charsheet.id-00001",
+                sName = "Mock Hero Resolved"
+            }
+        end
         function ActorManager.isPC(nodeCT)
+            if not nodeCT or not nodeCT.path then return false end
             return actorPC[nodeCT.path] == true
         end
         function ActorManager.setPC(nodeCTPath, val)
@@ -172,26 +210,6 @@ async function runTests() {
             end
             return list
         end
-
-        function DB.getValue(node, field, default)
-            -- If node is an effect mock
-            if type(node) == "table" and node.label and field == "label" then
-                return node.label
-            end
-            
-            local nodePath = ""
-            if type(node) == "table" and node.path then
-                nodePath = node.path
-            elseif type(node) == "string" then
-                nodePath = node
-            end
-            
-            local fullPath = nodePath .. "." .. field
-            if dbData[fullPath] ~= nil then
-                return dbData[fullPath]
-            end
-            return default
-        end
     `);
 
     // 2. Load the actual encumbrancetracker script
@@ -219,14 +237,86 @@ async function runTests() {
         }
     }
 
+    // --- TEST 1: checkFGC Permutations ---
+    await runAssert("checkFGC() modern FGU default", false, `
+        UtilityManager.isClientFGU = function() return true end
+        return checkFGC()
+    `);
 
+    await runAssert("checkFGC() via UtilityManager false", true, `
+        UtilityManager.isClientFGU = function() return false end
+        return checkFGC()
+    `);
 
-    // --- TEST 2: checkVariantEncumbrance ---
+    await runAssert("checkFGC() via Session.VersionMajor = 4", false, `
+        UtilityManager.isClientFGU = nil
+        Session.VersionMajor = 4
+        return checkFGC()
+    `);
+
+    await runAssert("checkFGC() via Session.VersionMajor = 3", true, `
+        UtilityManager.isClientFGU = nil
+        Session.VersionMajor = 3
+        return checkFGC()
+    `);
+
+    await runAssert("checkFGC() FGC string version '3.3.16'", true, `
+        UtilityManager.isClientFGU = nil
+        Session.VersionMajor = nil
+        Interface.setVersionString("3.3.16")
+        return checkFGC()
+    `);
+
+    await runAssert("checkFGC() FGU string version '4.1.2'", false, `
+        UtilityManager.isClientFGU = nil
+        Session.VersionMajor = nil
+        Interface.setVersionString("4.1.2")
+        return checkFGC()
+    `);
+
+    // Restore standard environment
+    await lua.doString(`
+        UtilityManager.isClientFGU = function() return true end
+        Session.VersionMajor = 4
+        Interface.setVersion(4, 2, 0)
+        IS_FGC = false
+        IS_FGU = true
+    `);
+
+    // --- TEST 2: getActorSafe Routing ---
+    await runAssert("getActorSafe() FGU routes to getActor", "Mock Hero", `
+        IS_FGC = false
+        local a = getActorSafe({ path = "combattracker.id-00001" })
+        return a.sName
+    `);
+
+    await runAssert("getActorSafe() FGC routes to resolveActor", "Mock Hero Resolved", `
+        IS_FGC = true
+        local a = getActorSafe({ path = "combattracker.id-00001" })
+        return a.sName
+    `);
+
+    // Reset IS_FGC back to false
+    await lua.doString("IS_FGC = false; IS_FGU = true");
+
+    // --- TEST 3: onInit Idempotency / /reload Guard ---
+    await lua.doString(`
+        CombatManager.resetActivationCalls()
+        onInit()
+        onInit()
+        onInit()
+        CombatManager.requestActivation({ path = "combattracker.id-00001" })
+    `);
+    await runAssert("CombatManager.requestActivation idempotency count", 1, `
+        return CombatManager.getActivationCalls()
+    `);
+
+    // --- TEST 4: checkVariantEncumbrance ---
     await runAssert("checkVariantEncumbrance() default variant", true, "return checkVariantEncumbrance()");
     await lua.doString("OptionsManager.setOption('HREN', 'standard')");
     await runAssert("checkVariantEncumbrance() set standard", false, "return checkVariantEncumbrance()");
 
-    // --- TEST 3: getEncumbranceMultiplier default ---
+    // --- TEST 5: getEncumbranceMultiplier default ---
     await lua.doString(`
         nodeChar = { path = "charsheet.id-00001" }
         -- Mock empty traits and features list
@@ -235,7 +325,7 @@ async function runTests() {
     `);
     await runAssert("getEncumbranceMultiplier() default", 1, "return getEncumbranceMultiplier(nodeChar)");
 
-    // --- TEST 4: getEncumbranceMultiplier with Equine Build trait ---
+    // --- TEST 6: getEncumbranceMultiplier with Equine Build trait ---
     await lua.doString(`
         OptionsManager.setOption("ENCUMBRANCETRACKER_MULTIPLIER_EQUINE", "on")
         DB.setChildren("charsheet.id-00001.traitlist", {
@@ -245,7 +335,7 @@ async function runTests() {
     `);
     await runAssert("getEncumbranceMultiplier() with Equine Build", 2, "return getEncumbranceMultiplier(nodeChar)");
 
-    // --- TEST 5: getEncumbranceMultiplier with Bear Aspect feature ---
+    // --- TEST 7: getEncumbranceMultiplier with Bear Aspect feature ---
     await lua.doString(`
         OptionsManager.setOption("ENCUMBRANCETRACKER_MULTIPLIER_BEAR", "on")
         DB.setChildren("charsheet.id-00001.traitlist", {}) -- clear trait
@@ -256,7 +346,22 @@ async function runTests() {
     `);
     await runAssert("getEncumbranceMultiplier() with Bear Aspect", 2, "return getEncumbranceMultiplier(nodeChar)");
 
-    // --- TEST 6: processEncumbranceForActor - Unencumbered ---
+    // --- TEST 8: getEncumbranceMultiplier Ruleset Fallback (CharManager in FGC 5E) ---
+    await lua.doString(`
+        CharEncumbranceManager5E = nil
+        CharManager = {
+            getEncumbranceMult = function(nodeChar) return 3 end
+        }
+        -- Clear trait and feature
+        DB.setChildren("charsheet.id-00001.traitlist", {})
+        DB.setChildren("charsheet.id-00001.featurelist", {})
+        OptionsManager.setOption("ENCUMBRANCETRACKER_MULTIPLIER_BEAR", "off")
+        OptionsManager.setOption("ENCUMBRANCETRACKER_MULTIPLIER_EQUINE", "off")
+    `);
+    await runAssert("getEncumbranceMultiplier() fallback to CharManager", 3, "return getEncumbranceMultiplier(nodeChar)");
+    await lua.doString("CharManager = nil");
+
+    // --- TEST 9: processEncumbranceForActor - Unencumbered ---
     await lua.doString(`
         nodeCT = { path = "combattracker.id-00001" }
         ActorManager.setPC(nodeCT.path, true)
@@ -265,6 +370,7 @@ async function runTests() {
         OptionsManager.setOption("ENCUMBRANCETRACKER_MULTIPLIER_BEAR", "off")
         OptionsManager.setOption("ENCUMBRANCETRACKER_MULTIPLIER_EQUINE", "off")
         DB.setChildren("charsheet.id-00001.featurelist", {})
+        DB.setChildren("charsheet.id-00001.traitlist", {})
         
         -- Strength 10, carrying 20 lbs. Lightly limit is 50 lbs. Max is 150 lbs.
         DB.setNodeValue("charsheet.id-00001.abilities.strength.score", 10)
@@ -280,7 +386,7 @@ async function runTests() {
     `);
     await runAssert("Unencumbered CT effects size", 0, "return #(ctEffects[nodeCT.path] or {})");
 
-    // --- TEST 7: processEncumbranceForActor - Lightly Encumbered ---
+    // --- TEST 10: processEncumbranceForActor - Lightly Encumbered ---
     await lua.doString(`
         -- Carrying 60 lbs (above 50 lbs limit)
         DB.setNodeValue("charsheet.id-00001.encumbrance.load", 60)
@@ -290,7 +396,7 @@ async function runTests() {
     await runAssert("Lightly Encumbered CT effects size", 1, "return #ctEffects[nodeCT.path]");
     await runAssert("Lightly Encumbered effect label", "Lightly Encumbered; Speed -10 ft;", "return ctEffects[nodeCT.path][1].label");
 
-    // --- TEST 8: processEncumbranceForActor - Heavily Encumbered ---
+    // --- TEST 11: processEncumbranceForActor - Heavily Encumbered ---
     await lua.doString(`
         -- Carrying 110 lbs (above 100 lbs limit)
         DB.setNodeValue("charsheet.id-00001.encumbrance.load", 110)
@@ -300,7 +406,7 @@ async function runTests() {
     await runAssert("Heavily Encumbered CT effects size", 1, "return #ctEffects[nodeCT.path]");
     await runAssert("Heavily Encumbered effect label", "Heavily Encumbered; Speed -20 ft; DISCHK: strength, dexterity, constitution; DISSAV: strength, dexterity, constitution; DISATK;", "return ctEffects[nodeCT.path][1].label");
 
-    // --- TEST 9: processEncumbranceForActor - Over Encumbered ---
+    // --- TEST 12: processEncumbranceForActor - Over Encumbered ---
     await lua.doString(`
         -- Carrying 160 lbs (above 150 lbs limit)
         DB.setNodeValue("charsheet.id-00001.encumbrance.load", 160)
@@ -309,6 +415,26 @@ async function runTests() {
     `);
     await runAssert("Over Encumbered CT effects size", 1, "return #ctEffects[nodeCT.path]");
     await runAssert("Over Encumbered effect label", "Over Encumbered; Speed 5 ft; DISCHK: strength, dexterity, constitution; DISSAV: strength, dexterity, constitution; DISATK;", "return ctEffects[nodeCT.path][1].label");
+
+    // --- TEST 13: processEncumbranceForActor - Nil / Empty Actor Safety ---
+    await lua.doString(`
+        -- Test nil CT actor node
+        local bOkNil, errNil = pcall(function()
+            processEncumbranceForActor(nil, nil)
+        end)
+        bNilPassed = bOkNil
+
+        -- Test unlinked CT actor (sCreatureNode = "")
+        local oldGetActor = ActorManager.getActor
+        ActorManager.getActor = function(n) return { sCreatureNode = "" } end
+        local bOkEmpty, errEmpty = pcall(function()
+            processEncumbranceForActor({ path = "combattracker.id-ghost" }, nil)
+        end)
+        bEmptyPassed = bOkEmpty
+        ActorManager.getActor = oldGetActor
+    `);
+    await runAssert("processEncumbranceForActor nil actor safety", true, "return bNilPassed");
+    await runAssert("processEncumbranceForActor empty creature node safety", true, "return bEmptyPassed");
 
     // 4. Print Summary
     console.log(`\nTest Summary: ${testsPassed} passed, ${testsFailed} failed.`);
