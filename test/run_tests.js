@@ -103,24 +103,32 @@ async function runTests() {
             dbData[path] = val
         end
         
-        function DB.getValue(node, field, default)
+        function DB.getValue(nodeOrPath, fieldOrDefault, defaultVal)
+            if defaultVal == nil and (type(fieldOrDefault) ~= "string" or fieldOrDefault == "" or (type(nodeOrPath) == "string" and nodeOrPath:match("^options%."))) then
+                local sPath = (type(nodeOrPath) == "table" and nodeOrPath.getPath and nodeOrPath.getPath()) or tostring(nodeOrPath)
+                if dbData[sPath] ~= nil then
+                    return dbData[sPath]
+                end
+                return fieldOrDefault
+            end
+
             -- If node is an effect mock
-            if type(node) == "table" and node.label and field == "label" then
-                return node.label
+            if type(nodeOrPath) == "table" and nodeOrPath.label and fieldOrDefault == "label" then
+                return nodeOrPath.label
             end
 
             local nodePath = ""
-            if type(node) == "table" and node.path then
-                nodePath = node.path
-            elseif type(node) == "string" then
-                nodePath = node
+            if type(nodeOrPath) == "table" and nodeOrPath.path then
+                nodePath = nodeOrPath.path
+            elseif type(nodeOrPath) == "string" then
+                nodePath = nodeOrPath
             end
             
-            local fullPath = nodePath .. "." .. field
+            local fullPath = nodePath .. "." .. fieldOrDefault
             if dbData[fullPath] ~= nil then
                 return dbData[fullPath]
             end
-            return default
+            return defaultVal
         end
         
         function DB.getText(node, field, default)
@@ -435,6 +443,25 @@ async function runTests() {
     `);
     await runAssert("processEncumbranceForActor nil actor safety", true, "return bNilPassed");
     await runAssert("processEncumbranceForActor empty creature node safety", true, "return bEmptyPassed");
+
+    // --- TEST 14: Options Database Fallback ---
+    await runAssert("encumbrance option helpers fall back to DB options when OptionsManager returns nil", true, `
+        return (function()
+            OptionsManager.setOption("ENCUMBRANCETRACKER_USE_EFFECTS", nil)
+            OptionsManager.setOption("HREN", nil)
+            OptionsManager.setOption("ENCUMBRANCETRACKER_VERBOSE", nil)
+
+            DB.setNodeValue("options.ENCUMBRANCETRACKER_USE_EFFECTS", "on")
+            DB.setNodeValue("options.HREN", "variant")
+            DB.setNodeValue("options.ENCUMBRANCETRACKER_VERBOSE", "max")
+
+            local bUseEffects = checkUseEffects()
+            local bVariant = checkVariantEncumbrance()
+            local bMax = checkVerbosityMax()
+
+            return bUseEffects == true and bVariant == true and bMax == true
+        end)()
+    `);
 
     // 4. Print Summary
     console.log(`\nTest Summary: ${testsPassed} passed, ${testsFailed} failed.`);

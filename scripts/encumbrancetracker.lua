@@ -177,19 +177,43 @@ end
 
 
 function checkUseEffects()
-    return OptionsManager.isOption(ENCUMBRANCETRACKER_USE_EFFECTS, ON)
+    if OptionsManager and OptionsManager.isOption and OptionsManager.isOption(ENCUMBRANCETRACKER_USE_EFFECTS, ON) then
+        return true
+    end
+    if DB and DB.getValue and DB.getValue("options." .. ENCUMBRANCETRACKER_USE_EFFECTS, "") == ON then
+        return true
+    end
+    return false
 end
 
 function checkVariantEncumbrance()
-    return OptionsManager.isOption("HREN", "variant")
+    if OptionsManager and OptionsManager.isOption and OptionsManager.isOption("HREN", "variant") then
+        return true
+    end
+    if DB and DB.getValue and DB.getValue("options.HREN", "") == "variant" then
+        return true
+    end
+    return false
 end
 
 function checkVerbosityMax()
-	return OptionsManager.isOption(ENCUMBRANCETRACKER_VERBOSE, MAX)
+    if OptionsManager and OptionsManager.isOption and OptionsManager.isOption(ENCUMBRANCETRACKER_VERBOSE, MAX) then
+        return true
+    end
+    if DB and DB.getValue and DB.getValue("options." .. ENCUMBRANCETRACKER_VERBOSE, "") == MAX then
+        return true
+    end
+    return false
 end
 
 function checkVerbosityOff()
-	return OptionsManager.isOption(ENCUMBRANCETRACKER_VERBOSE, OFF)
+    if OptionsManager and OptionsManager.isOption and OptionsManager.isOption(ENCUMBRANCETRACKER_VERBOSE, OFF) then
+        return true
+    end
+    if DB and DB.getValue and DB.getValue("options." .. ENCUMBRANCETRACKER_VERBOSE, "") == OFF then
+        return true
+    end
+    return false
 end
 
 -- Puts a message in chat that is broadcast to everyone attached to the host (including the host) if bSecret is true, otherwise local only.

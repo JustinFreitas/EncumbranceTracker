@@ -1,6 +1,6 @@
+.vs/
+.vscode/
 scripts/.luacheckrc
-build/out/EncumbranceTracker.zip
-build/out/EncumbranceTracker.ext
-.vscode/settings.json
-readme.txt
+scripts/luacheck.exe
+build/out/
 node_modules/
